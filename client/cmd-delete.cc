@@ -43,6 +43,7 @@ namespace snapper
 	     << _("\tsnapper delete <number>") << '\n'
 	     << '\n'
 	     << _("    Options for 'delete' command:") << '\n'
+	     << _("\t--all, -a\t\t\tDelete all snapshots.") << '\n'
 	     << _("\t--sync, -s\t\t\tSync after deletion.") << '\n'
 	     << endl;
     }
@@ -83,58 +84,79 @@ namespace snapper
     command_delete(GlobalOptions& global_options, GetOpts& get_opts, ProxySnappers*, ProxySnapper* snapper)
     {
 	const vector<Option> options = {
+	    Option("all",	no_argument,	'a'),
 	    Option("sync",	no_argument,	's')
 	};
 
 	ParsedOpts opts = get_opts.parse("delete", options);
 
 	bool sync = false;
+	bool all_snapshots = false;
 
 	ParsedOpts::const_iterator opt;
 
 	if ((opt = opts.find("sync")) != opts.end())
 	    sync = true;
 
-	if (!get_opts.has_args())
+	if ((opt = opts.find("all")) != opts.end())
+	    all_snapshots = true;
+
+	if ((!get_opts.has_args()) && !all_snapshots)
 	{
-	    SN_THROW(OptionsException(_("Command 'delete' needs at least one argument.")));
+	    SN_THROW(OptionsException(_("Command 'delete' needs at least one argument when not deleting all snapshots.")));
+	} else if (get_opts.has_args() && all_snapshots) {
+	    SN_THROW(OptionsException(_("Command 'delete' takes no arguments when deleting all snapshots.")));
 	}
 
 	ProxySnapshots& snapshots = snapper->getSnapshots();
 
 	vector<ProxySnapshots::iterator> nums;
 
-	while (get_opts.has_args())
-	{
-	    string arg = get_opts.pop_arg();
-
-	    if (arg.find_first_of("-") == string::npos)
-	    {
-		ProxySnapshots::iterator tmp = snapshots.findNum(arg);
-		nums.push_back(tmp);
+	if(all_snapshots) {
+	    ProxySnapshots::const_iterator active = snapshots.getActive();
+	    ProxySnapshots::const_iterator current = snapshots.getCurrent();
+	    for(ProxySnapshots::iterator iter = snapshots.find(1); iter != snapshots.end(); iter++) {
+		if((iter != active) && (iter != current)) {
+		    nums.push_back(iter);
+		}
 	    }
-	    else
+	    if(nums.empty()) {
+		SN_THROW(OptionsException(_("There are no snapshots that can be deleted.")));
+	    }
+	} else {
+	    while (get_opts.has_args())
 	    {
-		pair<ProxySnapshots::iterator, ProxySnapshots::iterator> range =
-		    snapshots.findNums(arg, "-");
+		string arg = get_opts.pop_arg();
 
-		if (range.first->getNum() > range.second->getNum())
-		    swap(range.first, range.second);
-
-		for (unsigned int i = range.first->getNum(); i <= range.second->getNum(); ++i)
+		if (arg.find_first_of("-") == string::npos)
 		{
-		    ProxySnapshots::iterator x = snapshots.find(i);
-		    if (x != snapshots.end())
+		    ProxySnapshots::iterator tmp = snapshots.findNum(arg);
+		    nums.push_back(tmp);
+		}
+		else
+		{
+		    pair<ProxySnapshots::iterator, ProxySnapshots::iterator> range =
+			snapshots.findNums(arg, "-");
+
+		    if (range.first->getNum() > range.second->getNum())
+			swap(range.first, range.second);
+
+		    for (unsigned int i = range.first->getNum(); i <= range.second->getNum(); ++i)
 		    {
-			if (find_if(nums.begin(), nums.end(), [i](ProxySnapshots::iterator it)
-								  { return it->getNum() == i; }) == nums.end())
-			    nums.push_back(x);
+			ProxySnapshots::iterator x = snapshots.find(i);
+			if (x != snapshots.end())
+			{
+			    if (find_if(nums.begin(), nums.end(), [i](ProxySnapshots::iterator it)
+								    { return it->getNum() == i; }) == nums.end())
+				nums.push_back(x);
+			}
 		    }
 		}
 	    }
+
+	    filter_undeletables(snapshots, nums);
 	}
 
-	filter_undeletables(snapshots, nums);
 
 	snapper->deleteSnapshots(nums, global_options.verbose());
 

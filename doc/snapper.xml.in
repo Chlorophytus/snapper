@@ -599,12 +599,13 @@
       </varlistentry>
 
       <varlistentry>
-	<term><option>delete (remove|rm) <replaceable>number</replaceable> |
+				<term><option>delete (remove|rm) <replaceable>-a</replaceable> | <replaceable>number</replaceable> |
 	<replaceable>number1-number2</replaceable></option></term>
 	<listitem>
-	  <para>Delete a snapshot or a range of snapshots.</para>
+	  <para>Delete a snapshot, all snapshots, or a range of snapshots.</para>
 	  <variablelist>
 	    <varlistentry>
+	      <term><option>-a, --all</option></term>
 	      <term><option>-s, --sync</option></term>
 	      <listitem>
 		<para>Sync the filesystem after deleting the snapshots. The

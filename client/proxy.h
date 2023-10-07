@@ -201,6 +201,8 @@ public:
 
     void erase(iterator it) { proxy_snapshots.erase(it); }
 
+
+
 protected:
 
     list<ProxySnapshot> proxy_snapshots;
